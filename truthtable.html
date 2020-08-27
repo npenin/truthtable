@@ -1,0 +1,290 @@
+<html>
+<link type="text/css" rel="stylesheet" id="dark-mode-general-link">
+<link type="text/css" rel="stylesheet" id="dark-mode-custom-link">
+<style type="text/css" id="dark-mode-custom-style"></style>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        html::-webkit-scrollbar {
+            /* we'll add padding as "border" in the thumb*/
+            height: 20px;
+            width: 20px;
+            background: white;
+        }
+
+        html::-webkit-scrollbar-track {
+            border-radius: 20px;
+            border: 7px solid white;
+            /* FIXME why doesn't "transparent" work here?! */
+            background-color: white;
+            width: 6px !important;
+            /* 20px scrollbar - 2 * 7px border */
+            box-sizing: content-box;
+        }
+
+        html::-webkit-scrollbar-track:hover {
+            background-color: #BFC0C2;
+        }
+
+        html::-webkit-scrollbar-thumb {
+            background-color: #3DAEE9;
+            /* default blue breeze color */
+            border: 7px solid transparent;
+            border-radius: 20px;
+            background-clip: content-box;
+            width: 6px !important;
+            /* 20px scrollbar - 2 * 7px border */
+            box-sizing: content-box;
+            min-height: 30px;
+        }
+
+        html::-webkit-scrollbar-thumb:window-inactive {
+            background-color: #949699;
+            /* when window is inactive it's gray */
+        }
+
+        html::-webkit-scrollbar-thumb:hover {
+            background-color: #93CEE9;
+            /* hovered is a lighter blue */
+        }
+
+        html::-webkit-scrollbar-corner {
+            background-color: white;
+            /* FIXME why doesn't "transparent" work here?! */
+        }
+    </style>
+    <script src="./truthtable_files/jquery.min.js.download"></script>
+
+    <style>
+        body {
+            font-size: 20pt;
+            font-family: 'Segoe UI', Tahoma, 'Arial Narrow';
+        }
+
+        .bg-success {
+            background-color: green;
+            color: 0;
+        }
+
+        .bg-danger {
+            background-color: red;
+            color: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="#" onclick="addInput()">Add new input</a>
+    <a href="#" onclick="addOutput()">Add new output</a>
+    <table id="verity">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <table id="formula">
+        <tbody></tbody>
+    </table>
+    <a href="#" onclick="validateFormula()">Validate Formula</a>
+    <a href="#" onclick="minimizeFormula()">Minimize Formula</a>
+    <script>
+        var values = [];
+
+        function addInput()
+        {
+            var lastColumn = $('#verity > thead > tr  > .input:last');
+            var i = lastColumn.index() + 1;
+            if (lastColumn.length == 0)
+                $('#verity > thead > tr').append('<th contentEditable="true" class="input">input' + i + '</th>');
+            else
+                lastColumn.after('<th contentEditable="true" class="input">input' + i + '</th>');
+            GenerateTable();
+        }
+
+        function addOutput()
+        {
+            var o = values.length;
+            $('#verity > thead > tr').append($('<th contentEditable="true" class="output">New output</th>').on('change', function ()
+            {
+                $('#formula tr:nth(' + o + ')').text($(this).text());
+            }));
+            $('#formula > tbody').append($('<tr><th class="output">New output</th><td><input /></td></tr>'));
+            values[o] = [];
+            GenerateTable();
+        }
+
+        function GenerateTable()
+        {
+            var body = $('#verity > tbody').empty();
+            var inputs = $('#verity > thead > tr > th.input');
+            var outputs = $('#verity > thead > tr > th.output');
+            for (var i = 0; i < Math.pow(2, inputs.length); i++)
+            {
+                var line = $('<tr>');
+                for (var j = 0; j < inputs.length; j++)
+                {
+                    $('<td class="input"></td>').appendTo(line).text(Math.floor(i / Math.pow(2, j)) % 2);
+                }
+
+                for (var j = 0; j < outputs.length; j++)
+                {
+                    $('<td class="output" contentEditable="true"></td>').text(values[j][i]).on('change', function ()
+                    {
+                        values[j][i] = $(this).text();
+                    }).appendTo(line);
+                }
+                line.appendTo(body);
+            }
+        }
+
+        function validateFormula()
+        {
+            var inputs = $('#verity > thead > tr > th.input');
+            var outputs = $('#verity > thead > tr > th.output');
+            var outputFormula = [];
+            var args = [];
+            for (var i = 0; i < inputs.length; i++)
+            {
+                args.push(inputs.get(i).innerText);
+            }
+            for (var i = 0; i < outputs.length; i++)
+            {
+                var outputArgs = [null].concat(args);
+                outputArgs.push('return ' + $('#formula > tbody > tr:nth(' + i + ') > td > input').val())
+                outputFormula[i] = new (Function.bind.apply(Function, outputArgs));
+            }
+            try
+            {
+
+                $('#verity > tbody > tr').each(function ()
+                {
+                    var $this = $(this);
+                    var args = [];
+                    var inputs = $this.find('.input');
+                    for (var i = 0; i < inputs.length; i++)
+                    {
+                        args.push(inputs.get(i).innerText.trimEnd().trimStart() == '1');
+                    }
+
+                    for (var i = 0; i < outputFormula.length; i++)
+                    {
+                        var output = $this.find('.output:nth(' + i + ')');
+                        var result = outputFormula[i].apply(this, args) ? 1 : 0;
+
+                        if (!output.text())
+                            output.text(result);
+                        else
+                        {
+                            if (result == output.text())
+                                output.removeClass('bg-success bg-danger').addClass('bg-success');
+                            else
+                                output.removeClass('bg-success bg-danger').addClass('bg-danger');
+                        }
+                    }
+                })
+            }
+            catch (e)
+            {
+                alert(e.message);
+            }
+
+        }
+
+        function minimizeFormula()
+        {
+            var inputs = $('#verity > thead > tr > th.input');
+            var outputs = $('#verity > thead > tr > th.output');
+            var outputFormula = [];
+            var args = [];
+            var outputConditions = [];
+            for (var i = 0; i < inputs.length; i++)
+            {
+                args.push(inputs.get(i).innerText);
+            }
+            var sums1 = [];
+            var sums0 = [];
+            $('#verity > tbody > tr').each(function ()
+            {
+                for (var i = 0; i < outputs.length; i++)
+                {
+                    var output = $('.output:nth(' + i + ')', this);
+                    outputConditions[i] = [];
+                    if (sums1.length <= i)
+                        sums1[i] = sums0[i] = 0;
+                    if (output.text() == '1')
+                        sums1[i]++;
+                    if (output.text() == '0')
+                        sums0[i]++;
+                }
+            });
+
+            try
+            {
+                $('#verity > tbody > tr').each(function ()
+                {
+                    var $this = $(this);
+                    var args = [];
+                    var reverseArgs = [];
+                    var score = 0;
+                    var inputs = $('.input', this);
+                    for (var i = 0; i < inputs.length; i++)
+                    {
+                        score += (inputs.get(i).innerText.trimStart().trimEnd() == '1' ? 1 : 0) << i;
+                        args.push(inputs.get(i).innerText.trimStart().trimEnd() == '1');
+                        reverseArgs.push(inputs.get(i).innerText.trimStart().trimEnd() == '0');
+                    }
+                    console.log(score);
+                    for (var i = 0; i < outputs.length; i++)
+                    {
+                        var output = $('.output:nth(' + i + ')', this);
+                        if (sums1[i] <= sums0[i] && output.text().trimStart().trimEnd() == '1')
+                            outputConditions[i].push(args);
+                        else if (sums0[i] < sums1[i] && output.text().trimStart().trimEnd() == '0')
+                        {
+                            outputConditions[i].opposite = true;
+                            outputConditions[i].push(reverseArgs);
+                        }
+                    }
+                });
+            }
+            catch (e)
+            {
+                alert(e.message);
+            }
+
+            for (var i = 0; i < outputConditions.length; i++)
+            {
+                var code = '';
+                for (var j = 0; j < outputConditions[i].length; j++)
+                {
+                    if (j > 0)
+                    {
+                        if (outputConditions[i].opposite)
+                            code += ' && ';
+                        else
+                            code += ' || ';
+
+                    }
+                    for (var k = 0; k < outputConditions[i][j].length; k++)
+                    {
+                        if (k > 0)
+                        {
+                            if (outputConditions[i].opposite)
+                                code += ' || ';
+                            else
+                                code += ' && ';
+                        }
+                        if (outputConditions[i].opposite && !outputConditions[i][j][k] || !outputConditions[i].opposite && !outputConditions[i][j][k])
+                            code += '!';
+                        code += args[k];
+                    }
+                }
+                $('#formula > tbody > tr:nth(' + i + ') > td > input').val(code);
+            }
+        }
+    </script>
+
+</body>
+
+</html>
